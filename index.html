@@ -642,7 +642,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand" id="brand">A little love story</div>
-      <button class="music-control" id="musicToggle" type="button" aria-label="Play Happy Birthday song" title="Start the Happy Birthday song">
+      <button class="music-control" id="musicToggle" type="button" aria-label="Play Happy Birthday song" title="Happy Birthday song">
         <span id="musicIcon" aria-hidden="true">♫</span><span id="musicLabel">Play Happy Birthday song</span>
       </button>
     </header>
@@ -1339,6 +1339,7 @@
     const musicToggle = document.getElementById("musicToggle");
     const musicLabel = document.getElementById("musicLabel");
     const musicIcon = document.getElementById("musicIcon");
+    let musicGestureFallbackActive = false;
     if (PERSONAL.musicUrl) {
       song.src = PERSONAL.musicUrl;
       musicToggle.title = "Play or pause your song";
@@ -1349,6 +1350,21 @@
       musicIcon.textContent = playing ? "Ⅱ" : "♫";
       musicLabel.textContent = playing ? "Pause Happy Birthday song" : "Play Happy Birthday song";
       musicToggle.setAttribute("aria-label", playing ? "Pause Happy Birthday song" : "Play Happy Birthday song");
+    }
+
+    function registerMusicGestureFallback() {
+      if (musicGestureFallbackActive) return;
+      musicGestureFallbackActive = true;
+      document.addEventListener("pointerdown", resumeMusicFromGesture);
+      document.addEventListener("keydown", resumeMusicFromGesture);
+    }
+
+    function resumeMusicFromGesture(event) {
+      if (event.target === musicToggle || musicToggle.contains(event.target)) return;
+      document.removeEventListener("pointerdown", resumeMusicFromGesture);
+      document.removeEventListener("keydown", resumeMusicFromGesture);
+      musicGestureFallbackActive = false;
+      startBirthdayMusic();
     }
 
     async function startBirthdayMusic() {
@@ -1370,11 +1386,25 @@
           }
         }
         updateMusicControl(true);
+        musicToggle.title = "Pause or resume the Happy Birthday song";
+        if (musicGestureFallbackActive) {
+          document.removeEventListener("pointerdown", resumeMusicFromGesture);
+          document.removeEventListener("keydown", resumeMusicFromGesture);
+          musicGestureFallbackActive = false;
+        }
       } catch (error) {
-        musicUnavailable = true;
-        musicToggle.title = "Birthday music could not start; the story still works perfectly.";
-        musicLabel.textContent = "Music unavailable";
-        console.warn("Birthday music could not be played:", error);
+        if (error.name === "NotAllowedError") {
+          updateMusicControl(false);
+          musicToggle.title = "Your browser blocked autoplay. Tap or press a key to start the song.";
+          musicLabel.textContent = "Tap for Happy Birthday song";
+          registerMusicGestureFallback();
+          console.info("Birthday music autoplay was blocked; it will start on the first interaction.");
+        } else {
+          musicUnavailable = true;
+          musicToggle.title = "Birthday music could not start; the story still works perfectly.";
+          musicLabel.textContent = "Music unavailable";
+          console.warn("Birthday music could not be played:", error);
+        }
       } finally {
         musicStarting = false;
       }
@@ -1411,6 +1441,8 @@
     });
 
     render();
+    registerMusicGestureFallback();
+    startBirthdayMusic();
   </script>
 </body>
 </html>
