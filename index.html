@@ -642,8 +642,8 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand" id="brand">A little love story</div>
-      <button class="music-control" id="musicToggle" type="button" aria-label="Play birthday music" title="Add a song in the personalization settings">
-        <span id="musicIcon" aria-hidden="true">♫</span><span id="musicLabel">Our song</span>
+      <button class="music-control" id="musicToggle" type="button" aria-label="Play birthday music" title="Start the birthday music">
+        <span id="musicIcon" aria-hidden="true">♫</span><span id="musicLabel">Play birthday music</span>
       </button>
     </header>
     <div class="progress-wrap" aria-label="Story progress">
@@ -723,7 +723,11 @@
     let paradeFinished = false;
     let paradeTimers = [];
     let paradeIntervals = [];
-    let paradeAudioContext = null;
+    let musicAudioContext = null;
+    let musicLoopTimer = null;
+    let musicIsPlaying = false;
+    let musicStarting = false;
+    let musicUnavailable = false;
     let heartPhotoIndex = 0;
     let photoSlideIndex = 0;
     const heartPhotosSeen = new Set();
@@ -1096,18 +1100,18 @@
     }
 
     function playBirthdayMelody() {
-      if (!paradeAudioContext || paradeAudioContext.state !== "running") return;
+      if (!musicAudioContext || musicAudioContext.state !== "running") return;
       const phrases = [
         [392, 392, 440, 392, 523, 494],
         [392, 392, 440, 392, 587, 523],
         [392, 392, 784, 659, 523, 494, 440],
         [698, 698, 659, 523, 587, 523]
       ];
-      const start = paradeAudioContext.currentTime + .05;
+      const start = musicAudioContext.currentTime + .05;
       let noteIndex = 0;
       phrases.flat().forEach((frequency) => {
-        const oscillator = paradeAudioContext.createOscillator();
-        const volume = paradeAudioContext.createGain();
+        const oscillator = musicAudioContext.createOscillator();
+        const volume = musicAudioContext.createGain();
         const noteStart = start + noteIndex * .34;
         oscillator.type = "triangle";
         oscillator.frequency.setValueAtTime(frequency, noteStart);
@@ -1115,20 +1119,16 @@
         volume.gain.exponentialRampToValueAtTime(.055, noteStart + .035);
         volume.gain.exponentialRampToValueAtTime(.0001, noteStart + .29);
         oscillator.connect(volume);
-        volume.connect(paradeAudioContext.destination);
+        volume.connect(musicAudioContext.destination);
         oscillator.start(noteStart);
         oscillator.stop(noteStart + .3);
         noteIndex += 1;
       });
     }
 
-    function stopParadeAudio() {
+    function clearParadeIntervals() {
       paradeIntervals.forEach(clearInterval);
       paradeIntervals = [];
-      if (paradeAudioContext && paradeAudioContext.state !== "closed") {
-        paradeAudioContext.close().catch((error) => console.warn("Birthday tune audio could not close cleanly:", error));
-      }
-      paradeAudioContext = null;
     }
 
     function finishBirthdayParade() {
@@ -1138,7 +1138,7 @@
       paradeIntervals.forEach(clearInterval);
       paradeTimers = [];
       paradeIntervals = [];
-      stopParadeAudio();
+      clearParadeIntervals();
       const stage = document.getElementById("paradeStage");
       const status = document.getElementById("paradeStatus");
       const lyric = document.getElementById("paradeLyric");
@@ -1189,21 +1189,6 @@
       let lyricIndex = 0;
       lyric.textContent = lyrics[lyricIndex];
       lyricIndex = 1;
-
-      const AudioContextClass = window.AudioContext;
-      if (AudioContextClass) {
-        try {
-          paradeAudioContext = new AudioContextClass();
-          paradeAudioContext.resume().then(playBirthdayMelody).catch((error) => {
-            console.warn("Birthday tune audio could not start; the animated celebration will continue:", error);
-          });
-          paradeIntervals.push(setInterval(playBirthdayMelody, 12000));
-        } catch (error) {
-          console.warn("Birthday tune audio is unavailable; the animated celebration will continue:", error);
-        }
-      } else {
-        console.warn("Web Audio is unavailable; the animated celebration will continue without the tune.");
-      }
 
       paradeIntervals.push(setInterval(() => {
         lyric.textContent = lyrics[lyricIndex % lyrics.length];
@@ -1262,6 +1247,7 @@
     story.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button || button.disabled) return;
+      if (!musicIsPlaying && !musicUnavailable) startBirthdayMusic();
       if (button.matches(".reveal-card")) {
         button.classList.toggle("is-open");
         button.setAttribute("aria-expanded", String(button.classList.contains("is-open")));
@@ -1316,7 +1302,7 @@
       } else if (action === "replay") {
         paradeTimers.forEach(clearTimeout);
         paradeTimers = [];
-        stopParadeAudio();
+        clearParadeIntervals();
         chapter = 1;
         letterOpened = false;
         finalRevealed = false;
@@ -1353,42 +1339,75 @@
     const musicToggle = document.getElementById("musicToggle");
     const musicLabel = document.getElementById("musicLabel");
     const musicIcon = document.getElementById("musicIcon");
-    let musicUnavailable = false;
     if (PERSONAL.musicUrl) {
       song.src = PERSONAL.musicUrl;
       musicToggle.title = "Play or pause your song";
-    } else {
-      musicToggle.title = "Add a song URL in the PERSONAL settings at the top of this file";
-      musicLabel.textContent = "Add our song";
-      musicToggle.disabled = true;
     }
-    musicToggle.addEventListener("click", async () => {
-      if (!PERSONAL.musicUrl || musicUnavailable) return;
-      if (song.paused) {
-        try {
+
+    function updateMusicControl(playing) {
+      musicIsPlaying = playing;
+      musicIcon.textContent = playing ? "Ⅱ" : "♫";
+      musicLabel.textContent = playing ? "Pause birthday music" : "Play birthday music";
+      musicToggle.setAttribute("aria-label", playing ? "Pause birthday music" : "Play birthday music");
+    }
+
+    async function startBirthdayMusic() {
+      if (musicUnavailable || musicIsPlaying || musicStarting) return;
+      musicStarting = true;
+      try {
+        if (PERSONAL.musicUrl) {
           await song.play();
-          musicIcon.textContent = "Ⅱ";
-          musicLabel.textContent = "Pause song";
-          musicToggle.setAttribute("aria-label", "Pause birthday music");
-        } catch (error) {
-          musicUnavailable = true;
-          musicLabel.textContent = "Song unavailable";
-          musicToggle.title = "The song could not be loaded; the story still works perfectly.";
-          musicToggle.disabled = true;
-          console.warn("Birthday music could not be played:", error);
+        } else {
+          const AudioContextClass = window.AudioContext;
+          if (!AudioContextClass) throw new Error("Web Audio is not supported in this browser.");
+          if (!musicAudioContext || musicAudioContext.state === "closed") {
+            musicAudioContext = new AudioContextClass();
+          }
+          await musicAudioContext.resume();
+          if (musicLoopTimer === null) {
+            playBirthdayMelody();
+            musicLoopTimer = setInterval(playBirthdayMelody, 8500);
+          }
         }
+        updateMusicControl(true);
+      } catch (error) {
+        musicUnavailable = true;
+        musicToggle.title = "Birthday music could not start; the story still works perfectly.";
+        musicLabel.textContent = "Music unavailable";
+        console.warn("Birthday music could not be played:", error);
+      } finally {
+        musicStarting = false;
+      }
+    }
+
+    async function pauseBirthdayMusic() {
+      if (!musicIsPlaying) return;
+      try {
+        if (PERSONAL.musicUrl) {
+          song.pause();
+        } else if (musicAudioContext && musicAudioContext.state !== "closed") {
+          await musicAudioContext.suspend();
+        }
+        updateMusicControl(false);
+      } catch (error) {
+        console.warn("Birthday music could not be paused:", error);
+      }
+    }
+
+    musicToggle.addEventListener("click", () => {
+      if (musicIsPlaying) {
+        pauseBirthdayMusic();
       } else {
-        song.pause();
-        musicIcon.textContent = "♫";
-        musicLabel.textContent = "Play song";
-        musicToggle.setAttribute("aria-label", "Play birthday music");
+        startBirthdayMusic();
       }
     });
     song.addEventListener("error", () => {
       musicUnavailable = true;
-      musicToggle.disabled = true;
       musicLabel.textContent = "Song unavailable";
       musicToggle.title = "The song could not be loaded; the story still works perfectly.";
+    });
+    song.addEventListener("pause", () => {
+      if (PERSONAL.musicUrl && musicIsPlaying) updateMusicControl(false);
     });
 
     render();
