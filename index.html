@@ -698,7 +698,8 @@
       finalSurpriseMessage: "If I could make one wish today, it would be to see you smile and know how loved you truly are.\n\nThank you for being you, for being part of my life, and for making ordinary moments feel special.\n\nNo matter how far apart we are, my heart will always choose you.\n\nHappy Birthday, My Love! ❤️🎂",
       finalPersonalMessage: "You are my favourite person, my sweetest memory, and one of the most beautiful parts of my life. 💗",
       hugMessage: "Imagine the biggest, warmest hug from me is wrapped around you right now. 🤗❤️",
-      musicUrl: "music/the_mountain-happy-birthday-508020.mp3"
+      musicUrl: "music/the_mountain-happy-birthday-508020.mp3",
+      finalMusicUrl: "music/01-Monk-Turner-Fascinoma-Its-Your-Birthday(chosic.com).mp3"
     };
 
     const CHAPTERS = [
@@ -762,7 +763,12 @@
       backButton.disabled = chapter === 1;
       story.innerHTML = chapterMarkup();
       if (chapter === 8) updateHeartPhoto();
-      if (chapter === 10) beginFinale();
+      if (chapter === 10) {
+        switchMusicTrack(PERSONAL.finalMusicUrl, "It's Your Birthday");
+        beginFinale();
+      } else if (activeMusicUrl !== PERSONAL.musicUrl) {
+        switchMusicTrack(PERSONAL.musicUrl, "Happy Birthday song");
+      }
       if (chapter === 9 && letterOpened) typeLetter();
     }
 
@@ -1339,17 +1345,34 @@
     const musicToggle = document.getElementById("musicToggle");
     const musicLabel = document.getElementById("musicLabel");
     const musicIcon = document.getElementById("musicIcon");
+    let activeMusicUrl = PERSONAL.musicUrl;
+    let activeMusicLabel = "Happy Birthday song";
+    let musicUserPaused = false;
     let musicGestureFallbackActive = false;
-    if (PERSONAL.musicUrl) {
-      song.src = PERSONAL.musicUrl;
-      musicToggle.title = "Play or pause your song";
+    if (activeMusicUrl) {
+      song.src = activeMusicUrl;
+      musicToggle.title = `Play or pause ${activeMusicLabel}`;
+    }
+
+    function switchMusicTrack(url, label) {
+      if (!url || activeMusicUrl === url) return;
+      const shouldResume = !musicUserPaused;
+      musicIsPlaying = false;
+      activeMusicUrl = url;
+      activeMusicLabel = label;
+      song.pause();
+      song.src = url;
+      song.load();
+      updateMusicControl(false);
+      musicToggle.title = `Play or pause ${activeMusicLabel}`;
+      if (shouldResume) startBirthdayMusic();
     }
 
     function updateMusicControl(playing) {
       musicIsPlaying = playing;
       musicIcon.textContent = playing ? "Ⅱ" : "♫";
-      musicLabel.textContent = playing ? "Pause Happy Birthday song" : "Play Happy Birthday song";
-      musicToggle.setAttribute("aria-label", playing ? "Pause Happy Birthday song" : "Play Happy Birthday song");
+      musicLabel.textContent = `${playing ? "Pause" : "Play"} ${activeMusicLabel}`;
+      musicToggle.setAttribute("aria-label", `${playing ? "Pause" : "Play"} ${activeMusicLabel}`);
     }
 
     function registerMusicGestureFallback() {
@@ -1370,8 +1393,9 @@
     async function startBirthdayMusic() {
       if (musicUnavailable || musicIsPlaying || musicStarting) return;
       musicStarting = true;
+      musicUserPaused = false;
       try {
-        if (PERSONAL.musicUrl) {
+        if (activeMusicUrl) {
           await song.play();
         } else {
           const AudioContextClass = window.AudioContext;
@@ -1413,7 +1437,8 @@
     async function pauseBirthdayMusic() {
       if (!musicIsPlaying) return;
       try {
-        if (PERSONAL.musicUrl) {
+        musicUserPaused = true;
+        if (activeMusicUrl) {
           song.pause();
         } else if (musicAudioContext && musicAudioContext.state !== "closed") {
           await musicAudioContext.suspend();
@@ -1437,7 +1462,7 @@
       musicToggle.title = "The song could not be loaded; the story still works perfectly.";
     });
     song.addEventListener("pause", () => {
-      if (PERSONAL.musicUrl && musicIsPlaying) updateMusicControl(false);
+      if (activeMusicUrl && musicIsPlaying) updateMusicControl(false);
     });
 
     render();
