@@ -642,8 +642,8 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand" id="brand">A little love story</div>
-      <button class="music-control" id="musicToggle" type="button" aria-label="Play birthday music" title="Start the birthday music">
-        <span id="musicIcon" aria-hidden="true">♫</span><span id="musicLabel">Play birthday music</span>
+      <button class="music-control" id="musicToggle" type="button" aria-label="Play Happy Birthday song" title="Start the Happy Birthday song">
+        <span id="musicIcon" aria-hidden="true">♫</span><span id="musicLabel">Play Happy Birthday song</span>
       </button>
     </header>
     <div class="progress-wrap" aria-label="Story progress">
@@ -698,7 +698,7 @@
       finalSurpriseMessage: "If I could make one wish today, it would be to see you smile and know how loved you truly are.\n\nThank you for being you, for being part of my life, and for making ordinary moments feel special.\n\nNo matter how far apart we are, my heart will always choose you.\n\nHappy Birthday, My Love! ❤️🎂",
       finalPersonalMessage: "You are my favourite person, my sweetest memory, and one of the most beautiful parts of my life. 💗",
       hugMessage: "Imagine the biggest, warmest hug from me is wrapped around you right now. 🤗❤️",
-      musicUrl: "" // Optional: path to a song you have permission to use, e.g. "music/our-song.mp3"
+      musicUrl: "music/the_mountain-happy-birthday-508020.mp3"
     };
 
     const CHAPTERS = [
@@ -1347,8 +1347,8 @@
     function updateMusicControl(playing) {
       musicIsPlaying = playing;
       musicIcon.textContent = playing ? "Ⅱ" : "♫";
-      musicLabel.textContent = playing ? "Pause birthday music" : "Play birthday music";
-      musicToggle.setAttribute("aria-label", playing ? "Pause birthday music" : "Play birthday music");
+      musicLabel.textContent = playing ? "Pause Happy Birthday song" : "Play Happy Birthday song";
+      musicToggle.setAttribute("aria-label", playing ? "Pause Happy Birthday song" : "Play Happy Birthday song");
     }
 
     async function startBirthdayMusic() {
